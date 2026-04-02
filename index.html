@@ -2,7 +2,8 @@
 <html>
 <!-- these two are needed for storing mouse positions. -->
   <p id="x" style="display:none;"></p>
-  <p id="y" style="display:none;"></p>
+  <p id="y" style="display:none"></p>
+  <span id = "storage" style = "visibility:hidden;font-size:12px;font-family:Arial">hi</span>
 
   <canvas
     id="barmenu"
@@ -23,6 +24,7 @@
       function UpdateMousePos(event) {
         pageX.innerText = event.pageX;
         pageY.innerText = event.pageY;
+        RedrawScreen();
       }
       //triggers mouse pos grabbing
       barmenu.addEventListener("mousemove", UpdateMousePos);
@@ -30,6 +32,22 @@
       barmenu.addEventListener("mouseleave", UpdateMousePos);
       //on click, runs function
       barmenu.addEventListener("click", CheckButton);
+
+    /**
+    //gets the width of all the characters. Probably unecessary.
+    const textchars = [
+      "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z",
+      "A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
+      "1","2","3","4","5","6","7","8","9","0"
+    ]
+    textcharwidth = [
+      
+    ]
+    for(let i = 0; i<textchars.length; i++){
+      textcharwidth[i] = GetPxWidth(textchars[i],"12px","serif")
+    }
+    **/
+
 
 
       actionbars = [
@@ -137,8 +155,7 @@
         
       ]
 
-    
-      shownresources = 4;
+      
       //resources 
       //format: name, quantity, cap, colour, border colour, shown?
       //shown? indicates if it shouldn't be hidden until unlocked and still tracked. Bars with 100 capacity can still be created automatically
@@ -165,19 +182,22 @@
         ["Chaos",2,40,"Lime","Orange"],
       ]
       
+
+      
       
       upgradebars = [
         //format:
         //name, prog, max prog, progress colour, border colour, show?, max comps, current comps (start at 0)
         ["Get a Bag",0,100,"Gold","Black",true,1,0],
-        ["Buy Pickaxe",0,10,"Red",,false,3,0]
+        ["Buy Pickaxe",0,10,"Red",,false,3,0],
+        ["Buy More Bag Space",0,3,"Gold",,true,4,0]
         
         ]
       
       upgradebareffects = [
-        
+        /** Get a Bag **/
         [
-          /** Get a Bag **/
+          
           [
             //on click
             ["Progress",10]
@@ -194,8 +214,9 @@
             ["Unlock","Buy Pickaxe"]
           ]
         ],
+        
+        /** Buy Pickaxe **/
         [
-          /** Buy Pickaxe **/
           [
             //on click
             ["Progress",1]
@@ -217,9 +238,59 @@
           ]
         ],
         
+        /** Buy More Bag Space **/
+        [
+          [
+            //on click
+            ["Progress",1]
+          ],
+          [
+            //start cost
+            ["Coins",-10,true]
+          ],
+          [
+            //on prog
+          ],
+          [
+            //on comp
+            //Increment the upgrade "Get a Bag"'s max buys (Capacity) by 2
+            //Action, location, name, effect, quantity
+            ["Increment","Upgrade","Get a Bag","Cap",2]
+          ]
+        ],
+        
         
         ]
+        
       
+      
+      //The descriptions to display for various bars
+      barDescs = 
+      [
+        [ // Resources
+          "Money",
+          "Magic",
+          "Don't lose it",
+          "Random",
+          "Like a big rock",
+          "Like a shiny rock",
+          "Tiredness"
+        ],
+        [ //Actions
+          "Spend health to get money. This part is added on as Lorem Ipsum text to test the writing function. It will go on for a while, but it does end in less than a thousand characters.",
+          "Spend money to get mana.",
+          "Spend mana to get health.",
+          "Mine for diamonds."
+            
+          
+        ],
+        [ // Upgrades
+          "Buy a bag.",
+          "Buy a pickaxe for better mining.",
+          "Buy a bag to hold more bags."
+        ]
+        
+      ]
       
       //Arrays to store buttons
       resourcebtns = []
@@ -240,8 +311,20 @@
         //there is no item in the list
         return false;
       }
+      
+      //Get the length, in pixels, of a string. Thanks, StackOverflow
+      function GetPxWidth(value, size = "12px", font = "Arial"){
+        let storage = document.getElementById("storage");
+        storage.style = "visibility:hidden;font-size:"+size+";font-family:"+font;
+        storage.innerText = value;
+        //console.log(storage.offsetWidth)
+        return storage.offsetWidth;
+        
+      }
 
       function RedrawScreen(){
+        let mx = document.getElementById("x").innerHTML;
+        let my = document.getElementById("y").innerHTML;
         
         //draw area boxes (separate resources and actions and other future things)
 
@@ -253,6 +336,7 @@
 
         //draw bars and buttons
         let barfoo = DrawBars(resources,30,-30);
+        
         resourcebtns = barfoo[0];
         ctx.strokeStyle = "Black";
         ctx.fillStyle = "Black";
@@ -264,6 +348,177 @@
         ctx.fillText("Upgrades",410,30);
         upgradebtns = DrawBars(upgradebars,410,55,undefined,true,undefined,3)[0]
         //console.log(upgradebtns)
+        
+        /** Hover tooltips **/
+        function CheckForBtn(bar){
+          //checks if the mouse is within the dimensions of the given bar
+          for (let i=0; i<bar.length; i++){
+            if(
+               mx <= bar[i][0] + bar[i][3] &&
+               mx >= bar[i][0]             &&
+               my <= bar[i][1] + bar[i][2] &&
+               my >= bar[i][1]
+              ){
+                return i; 
+            }
+          }
+        } //end of CheckForBtn
+        let clickedBar = CheckForBtn(resourcebtns);
+        let clickedArea = "Resources";
+        let descDraw = 0;
+        if(clickedBar === undefined){
+          clickedBar = CheckForBtn(actionbtns);
+          clickedArea = "Actions";
+          descDraw++
+          if(clickedBar === undefined){
+            clickedBar = CheckForBtn(upgradebtns);
+            clickedArea = "Upgrades";
+            descDraw++
+            if(clickedBar === undefined){
+              clickedArea = "Error";
+              descDraw = "Error";
+              //It's not an error
+              //throw new Error("Unrecognized Bar");
+              //shouldn't be doing anything with hover, but delete this if anything is added
+              return false;
+              
+            }else{
+              clickedBar = SearchList(upgradebars,upgradebtns[clickedBar][3],0);
+            }
+          } else{
+            clickedBar = SearchList(actionbars,actionbtns[clickedBar][3],0);
+          }
+        } else{
+          clickedBar = SearchList(resources,resourcebtns[clickedBar][3],0);
+        }
+        //offsets are to compensate for canvas offset. Extra 20px so the mouse doesn't cover the box.
+        if(clickedBar !== false){
+          
+          const boxWidth = 300
+          const boxHeight = 200
+          const boxX = mx - -10
+          const boxY = my-50;
+          const spcw = 5; //space width (for description-sized text)
+          
+          
+          ctx.fillStyle = "Grey";
+          
+          ctx.lineWidth = 5;
+
+          ctx.fillRect(boxX,boxY,boxWidth,boxHeight)
+          ctx.strokeRect(boxX,boxY,boxWidth,boxHeight)
+          
+          
+
+          
+          ctx.lineWidth = 1;
+          const ttlw = 300; //tooltip line width (in px)
+          const lspace = 10; //letter space 
+          const lheight = 20; // line height
+          const xpad = 20;
+          const ypad = 5+lheight;
+          if(descDraw != "Error"){
+            clickedBar = SearchList()
+            //TODO: this is broken, it doesn't account for hidden bars.
+            descDraw = barDescs[descDraw][clickedBar]
+            console.log(descDraw)
+          }
+          else{
+            throw new Error("descDraw is Error");
+          }
+          
+            ctx.fillStyle = "Black";
+            ctx.textAlign = "left";
+            let drx = boxX+xpad
+            let dry = boxY+ypad
+            //console.log(descDraw)
+            
+            let foobar = "Error"
+            let foobtn = "Error"
+            let cBar = "Error"
+            if (clickedArea == "Resources"){
+              foobar = resources
+              foobtn = resourcebtns
+            }
+            else if (clickedArea == "Actions"){
+              foobar = actionbars
+              foobtn = actionbtns
+            }
+            else if (clickedArea == "Upgrades"){
+              foobar = upgradebars
+              foobtn = upgradebtns
+            }
+            if(foobar == "Error"){
+              throw new Error("No bar area found! (in RedrawScreen)")
+           }else{
+             cBar = SearchList(foobar,foobtn[clickedBar][4],0)
+            ctx.fillText(foobar[cBar][0],drx,dry)
+           }
+           
+           //ctx.textAlign = "right"
+           
+           
+           
+           ctx.textAlign = "left"
+
+            
+            //dry+=lheight
+            
+            
+            
+            
+            ctx.font = "16px serif";
+            //Draw the bar's description
+            let itr = -1; // iterator
+            while(itr < descDraw.length && itr<1000){ // 1000-character limit total
+              let itr2 = 1
+              let word = ""
+              while(descDraw[itr+itr2] != " " && descDraw[itr+itr2]!=undefined && itr2 < 20 && itr+itr2<descDraw.length){ //20-character limit per word
+                word += descDraw[itr+itr2];
+                itr2++
+              }
+              
+
+              
+              let ndrx=drx + GetPxWidth(word,"16px", "serif"); //next draw x
+              
+              
+              if(ndrx-boxX<=ttlw-xpad*2){
+                ctx.fillText(word,drx,dry+ypad);
+              }else{
+                dry+=lheight;
+                drx = boxX+xpad;
+                ndrx = drx+GetPxWidth(word,"16px", "serif");
+                ctx.fillText(word,drx,dry+ypad);
+                //console.log("newline")
+              }
+              word+=" ";
+              drx = ndrx+spcw
+              itr += itr2
+            }
+            
+            /**
+            for(let i = 0; ttlw*i<descDraw.length; i++){
+              
+              for(let j = 0; j<ttlw; j++){
+                let fooa = descDraw[i*ttlw+j];
+                if(fooa == undefined){
+                  fooa = ""
+                }
+                ctx.fillText(fooa,drx,dry);
+                drx+=lspace
+              }
+              drx-=lspace*ttlw
+              dry+= lheight
+              
+            }
+            **/
+          
+        }
+
+
+        
+        
         
 
         ctx.stroke();
@@ -278,6 +533,7 @@
         let clickedBar = false //stores the index of the clicked bar
         let storeresources = [] //deep copy of resources to hold information while the bar's click effects are being processed.
         //make a deep copy
+        
         for(let i = 0; i<resources.length; i++){
           //set up the row
           storeresources[i]=[]
@@ -286,9 +542,15 @@
             storeresources[i][j] = resources[i][j];
           }
         }
-        
-        //console.log(storeresources)
-        
+
+        let storeupgradebars = [] // deep copy of upgradebars, used when the capacity needs to be incremented
+        for(let i = 0; i < upgradebars.length; i++){
+          storeupgradebars[i] = []
+          for(let j = 0; j < upgradebars[i].length; j++){
+              storeupgradebars[i][j] = upgradebars[i][j]
+          }
+        }
+
         function DoResourceLogic(currenteff,searchres,isprogged = false){
           let foo = 1;
           if(isprogged !== false){
@@ -323,7 +585,6 @@
 
         function ProcessEffect(curreff,clickedData){
           //Does the effects
-            
             for(let i = 0; i<curreff.length;i++){ // for each effect
               //currenteff stands for "current effect"
               let currenteff = curreff[i]
@@ -348,9 +609,9 @@
                   if(searchres !== false){
                     storeresources[searchres][5] = true;
                   }else {
-                    searchres = SearchList(upgradebars,currenteff[1],0);
+                    searchres = SearchList(storeupgradebars,currenteff[1],0);
                     if(searchres !== false){
-                      upgradebars[searchres][5] = true;
+                      storeupgradebars[searchres][5] = true;
                     }
                     //add additional unlock casing here
                   }
@@ -390,6 +651,34 @@
                     
                   }
                   
+                  
+                }else if (currenteff[1] == "Upgrade"){
+                  //Max buys, TODO: the ability to increment effects. This could be done by incrementing the stat based on the number of that upgrade that are currently owned, then incrementing the stat?
+                  if(currenteff[3] == "Cap"){
+
+                    
+                    if(typeof currenteff[2] == "number"){
+                      storeupgradebars[currenteff[2]][6] += currenteff[4];
+                    } else {
+                      let fooo = SearchList(storeupgradebars,currenteff[2],0);
+
+                      if(fooo === false){
+                        throw new Error("Could not find something to increment")
+                        return false;
+                      }
+                      
+
+                        //Don't use clickedData!!!!!
+                        storeupgradebars[fooo][6] += currenteff[4];
+                      
+                      
+                      
+                    }
+                    
+                    
+                  } else {
+                    throw new Error("Didn't increment cap");
+                  }
                   
                 } else{
                   throw new Error("Tried to upgrade something other than an action!")
@@ -469,7 +758,7 @@
           //resource kinda does nothing right now
           if(barArea == "resource"){
                       
-          let clickedBar = SearchList(upgradebars,upgradebtns[clickedBar][4],0);
+          let clickedBar = SearchList(storeupgradebars,upgradebtns[clickedBar][4],0);
           if(clickedBar == false){
             throw new Error("Upgrade Bar Not Found!! Searching for: "+upgradebtns[clickedBar][4]);
             //the error should exit the function beore the return is reached?
@@ -485,26 +774,24 @@
             //TODO: add code for resource button click effects here (if any, probably just displays details in the showbox, whenever that's created)
 
             
-          } else if (barArea == "action"){
+          }else if (barArea == "action"){
             
-            
-            
+
+          //this is not working
+          let barnum = SearchList(actionbars,actionbars[clickedBar][0],0);
           
-          let barnum = SearchList(actionbars,actionbtns[clickedBar][0],0);
-          
-          if(clickedBar === false){
-            throw new Error("Upgrade Bar Not Found!! Searching for: "+actionbtns[clickedBar][0]);
+          if(barnum === false){
+            throw new Error("Upgrade Bar Not Found!! Searching for: "+actionbars[clickedBar][0]);
             //the error should exit the function beore the return is reached?
             //Note: don't count on this returning false, might be better to return the error? Pain to implement though 
             return false;
           }
           
-          
-          
-          
+
 
             //deep copy
             for(let i = 0; i<actionbars[barnum].length; i++){
+              
               clickedData[i] = actionbars[barnum][i];
             }
             //console.log(clickedData)
@@ -517,8 +804,7 @@
             if(ProcessEffect(curreff, clickedData)===false){
               return false;
             }
-            
-            
+
             //Does Start Costs
             function DoStartCost(){
             
@@ -562,89 +848,88 @@
 
           //console.log("clickedData:")
           //console.log(clickedData);
-        }else if (barArea == "upgrade"){
-          //copied from action block
-          
-          let barnum = SearchList(upgradebars,upgradebtns[clickedBar][4],0);
-          
-          if(barnum === false){
-            throw new Error("Upgrade Bar Not Found!! Searching for: "+upgradebtns[clickedBar][4]);
-            //the error should exit the function beore the return is reached?
-            //Note: don't count on this returning false, might be better to return the error? Pain to implement though 
-            return false;
-          }
-          
-          //deep copy
-          for(let i = 0; i<upgradebars[clickedBar].length; i++){
-            clickedData[i] = upgradebars[barnum][i];
-          }
-          //console.log(clickedData)
-          let startprog = clickedData[1]
-          let clickedEffects = upgradebareffects[barnum];
-
-          //On click effects
-          let curreff = clickedEffects[0]
-          //console.log(clickedEffects)
-          
-          if(ProcessEffect(curreff, clickedData)===false){
-            return false;
-          }
-          
-          //Does Start Costs
-          function DoStartCost(){
-          
-            //console.log("started") 
-            //code taken from the on click effects
-            if(ProcessEffect(clickedEffects[1],clickedData) === false){
-              return false;
-            }
-
-          } // end of DoStartCost
-          
-          
-          //check if the action was just started from no progress
-          if(startprog == 0 && clickedData[1]>0){
-            if (DoStartCost() === false){
-              return false; //break if the resource goes negative or overflows
-            }
-          }
-          
-          /** On prog effects **/
-            //current effect
-            if(ProcessEffect(clickedEffects[2],clickedData) === false){
+          }else if (barArea == "upgrade"){
+            
+            //copied from action block
+            let barnum = SearchList(storeupgradebars,upgradebtns[clickedBar][4],0);
+            if(barnum === false){
+              throw new Error("Upgrade Bar Not Found!! Searching for: "+upgradebtns[clickedBar][4]);
+              //the error should exit the function beore the return is reached?
+              //Note: don't count on this returning false, might be better to return the error? Pain to implement though 
               return false;
             }
             
-            /** On comp effects **/
 
-            while(clickedData[1] >= upgradebars[barnum][2]){
-
-              curreff = clickedEffects[3];
-              //this is the last passed test, therefore processeffect is breaking
-              if (ProcessEffect(curreff, clickedData) === false){
+            //deep copy
+            for(let i = 0; i<storeupgradebars[clickedBar].length; i++){
+              clickedData[i] = storeupgradebars[barnum][i];
+            }
+            //console.log(clickedData)
+            let startprog = clickedData[1]
+            let clickedEffects = upgradebareffects[barnum];
+  
+            //On click effects
+            let curreff = clickedEffects[0]
+            //console.log(clickedEffects)
+            if(ProcessEffect(curreff, clickedData)===false){
+              return false;
+            }
+            
+            //Does Start Costs
+            function DoStartCost(){
+            
+              //console.log("started") 
+              //code taken from the on click effects
+              if(ProcessEffect(clickedEffects[1],clickedData) === false){
+                return false;
+              }
+  
+          } // end of DoStartCost
+            
+            
+            //check if the action was just started from no progress
+            if(startprog == 0 && clickedData[1]>0){
+              if (DoStartCost() === false){
+                return false; //break if the resource goes negative or overflows
+              }
+            }
+            /** On prog effects **/
+              //current effect
+              if(ProcessEffect(clickedEffects[2],clickedData) === false){
                 return false;
               }
               
-              //resets progress, but allows the action to be completed multiple times per click. TODO: Should probably be doing start costs here as well, or else it will only cost one start cost per click
-              clickedData[1] -= upgradebars[barnum][2];
-              clickedData[7]++;
+              /** On comp effects **/
+  
+              while(clickedData[1] >= storeupgradebars[barnum][2]){
+  
+                curreff = clickedEffects[3];
+                //this is the last passed test, therefore processeffect is breaking
+                if (ProcessEffect(curreff, clickedData) === false){
+                  return false;
+                }
+                
+                //resets progress, but allows the action to be completed multiple times per click. TODO: Should probably be doing start costs here as well, or else it will only cost one start cost per click
+                clickedData[1] -= storeupgradebars[barnum][2];
+                clickedData[7]++;
+  
+              }
 
-            }
-
-            //save the changes made to the clicked bar
-            upgradebars[barnum] = clickedData;
-            resources = storeresources;
-            RedrawScreen();
+              //save the changes made to the clicked bar
+              upgradebars = storeupgradebars;
+              upgradebars[barnum] = clickedData;
+              resources = storeresources;
+              RedrawScreen();
+              
             
-          
-          
-          
-          
-        }else{
-          //this code doesn't seem to be working?
-          //this throws an error if a button wasn't clicked as well
-          //throw new RangeError("Could not find button");
-          console.log("no button was pressed");
+            
+            
+            
+          }else{
+            //this code doesn't seem to be working?
+            //this throws an error if a button wasn't clicked as well
+            //throw new RangeError("Could not find button");
+            console.log("no button was pressed");
         }
         
         }
@@ -674,11 +959,11 @@
         ctx.fillRect(x, y, w*(prog/max),h);
         ctx.strokeRect(x, y, w, h);
         if(dotext !== false){
-        ctx.fillStyle = "Black"
-        let foo = ctx.textAlign
-        ctx.textAlign = "center"
-        ctx.fillText(dotext,x+w/2,y+h/2)
-        ctx.textAlign = foo
+          ctx.fillStyle = "Black"
+          let foo = ctx.textAlign
+          ctx.textAlign = "center"
+          ctx.fillText(dotext,x+w/2,y+h/2)
+          ctx.textAlign = foo
         }
       }
       
