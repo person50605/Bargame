@@ -1,0 +1,719 @@
+<!DOCTYPE HTML>
+<html>
+<!-- these two are needed for storing mouse positions. -->
+  <p id="x" style="display:none;"></p>
+  <p id="y" style="display:none;"></p>
+
+  <canvas
+    id="barmenu"
+    height="1000"
+    width="1500"
+    style="border: 1px solid #000000; position: fixed; left: 10px; top: 50px"
+  >
+  </canvas>
+  <script>
+      //set up canvas drawing
+      var c = document.getElementById("barmenu");
+      var ctx = c.getContext("2d");
+      //set up mouse detection
+      const pageX = document.getElementById("x");
+      const pageY = document.getElementById("y");
+
+      //grabs the mouse pos
+      function UpdateMousePos(event) {
+        pageX.innerText = event.pageX;
+        pageY.innerText = event.pageY;
+      }
+      //triggers mouse pos grabbing
+      barmenu.addEventListener("mousemove", UpdateMousePos);
+      barmenu.addEventListener("mouseenter", UpdateMousePos);
+      barmenu.addEventListener("mouseleave", UpdateMousePos);
+      //on click, runs function
+      barmenu.addEventListener("click", CheckButton);
+
+
+      actionbars = [
+        //Format: Name (also text displayed), progress, max progress, colour, border colour,
+        ["Get coins",0,50,"Gold","Black",true],
+        ["Get mana",0,100,"Blue",,true],
+        ["Heal",0,10,"Red"],
+        ["Mine",0,5,"Gray"]
+
+      ]
+
+      actionbareffects = [
+        //format: on click effects (mostly prog gain), base cost, run cost (per progress), result
+        //costs and results are formatted as [resource, quantity, is required?,unlocks?]. 
+        //Costs must be negative. 
+        //Resource is the index of the item in the resources list or the resource name.
+        //is required? If the quantity is negative, indicates whether or not it needs to be consumed in order for the thing to work. If quantity is positive, indicates whether it can overflow. Set to true if required, leave blank or false if not.
+        //unlocks? If it unlocks the resource for viewing and mentioning in the resourcebar thing
+        [
+          /** Get Coins **/
+          [
+            //on click
+            ["Progress",1],
+            ["Unlock","Heal"]
+          ],
+          [
+            //start cost
+            ["Health",-25,true]
+          ],
+          [
+            //on prog
+            ["Coins",2,false],
+            ["Health",-1,true]
+          ],
+          [
+            //on comp
+            ["Coins",10,false]
+          ]
+        ],
+
+        [
+        /** Get mana **/
+          [
+            //on click
+            ["Progress",2]
+          ],
+          [
+            //start cost
+            ["Coins",-5,true]
+          ],
+          [
+            //on prog
+            ["Mana",2,false],
+            ["Coins",-1,true]
+          ],
+          [
+            //on comp
+            ["Chaos",10,false]
+          ]
+        ],
+        
+        [
+        /** Heal **/
+          [
+            //on click
+            ["Progress",1]
+          ],
+          [
+            //start cost
+            ["Mana",-5,true]
+          ],
+          [
+            //on prog
+            ["Mana",-1,true],
+            ["Health",3,false]
+          ],
+          [
+            //on comp
+            ["Chaos",-10,false],
+            ["Unlock","Mine"]
+          ]
+        ],
+                [
+        /** Mine **/
+          [
+            //on click
+            ["Progress",1]
+          ],
+          [
+            //start cost
+            ["Mana",-5,true]
+          ],
+          [
+            //on prog
+            ["Stone",1,false],
+            ["Unlock","Stone"],
+            ["Health",-1,true]
+          ],
+          [
+            //on comp
+            ["Crystal",10,false],
+            ["Unlock","Crystal"]
+          ]
+        ],
+        
+      ]
+
+    
+      shownresources = 4;
+      //resources 
+      //format: name, quantity, cap, colour, border colour, shown?
+      //shown? indicates if it shouldn't be hidden until unlocked and still tracked. Bars with 100 capacity can still be created automatically
+      resources = 
+      [
+        ["Coins",10000,10000,"Gold",,true],
+        ["Mana",70,200,"Blue",,true],
+        ["Health",100,100,"Red",,true],
+        ["Chaos",15,40,"Lime","Orange",,true],
+        ["Stone",0,100,"Gray",,false],
+        ["Crystal",100,250,"CornflowerBlue",,false],
+        ["Fatigue",100,100]
+      ]
+      //The bars in the resource section.
+      //these are only display bars, and do not actually contain the resource information.
+      //these also need to have their progress values constantly updated
+      
+      //might be obsolete
+      resourcebars = [
+        //Format: Name, progress, max progress, colour, border colour
+        ["Coins",10,100,"Gold"],
+        ["Mana",50,200,"Blue"],
+        ["Health",100,100,"Red"],
+        ["Chaos",2,40,"Lime","Orange"],
+      ]
+      
+      
+      upgradebars = [
+        //format:
+        //name, prog, max prog, progress colour, border colour, show?, max comps, current comps (start at 0)
+        ["Get a Bag",0,100,"Gold","Black",true,1,0],
+        ["Buy Pickaxe",0,10,"Red",,false,3,0]
+        
+        ]
+      
+      upgradebareffects = [
+        
+        [
+          /** Get a Bag **/
+          [
+            //on click
+            ["Progress",10]
+          ],
+          [
+            //start cost
+            ["Coins",-50,true]
+          ],
+          [
+            //on prog
+          ],
+          [
+            //on comp
+            ["Unlock","Buy Pickaxe"]
+          ]
+        ],
+        [
+          /** Buy Pickaxe **/
+          [
+            //on click
+            ["Progress",1]
+          ],
+          [
+            //start cost
+            ["Coins",-50,true]
+          ],
+          [
+            //on prog
+            ["Crystal",-2,true],
+            ["Coins",-10,true]
+          ],
+          [
+            //on comp
+            //Increment the action "Mine"'s box with index 2 (On Prog) and increase the item with index 0 (Stone) by 1
+            //Action, location, name, effect, item, quantity
+            ["Increment","Action","Mine",2,0,1]
+          ]
+        ],
+        
+        
+        ]
+      
+      
+      //Arrays to store buttons
+      resourcebtns = []
+      actionbtns = []
+      upgradebtns = []
+      
+      
+      //utility functions
+      
+      //Search an array "list" for a value that matches the list[i][index], returning the index of the value
+      function SearchList(list,value,index){
+        //search the list
+        for(let i = 0; i < list.length; i++){
+          if(list[i][index] == value){
+            return i;
+          }
+        }
+        //there is no item in the list
+        return false;
+      }
+
+      function RedrawScreen(){
+        
+        //draw area boxes (separate resources and actions and other future things)
+
+        ctx.beginPath();
+        ctx.clearRect(0,0,10000,1000);
+        ctx.stroke();
+        //Idk if i need these
+        ctx.beginPath();
+
+        //draw bars and buttons
+        let barfoo = DrawBars(resources,30,-30);
+        resourcebtns = barfoo[0];
+        ctx.strokeStyle = "Black";
+        ctx.fillStyle = "Black";
+        ctx.font = "25px serif"
+        ctx.strokeRect(0,0,400,60+50*barfoo[1]);
+        ctx.strokeRect(0,60+50*barfoo[1],1000,500);
+        ctx.fillText("Actions",30,90+50*barfoo[1]);
+        actionbtns = DrawBars(actionbars,60,90+50*barfoo[1],undefined,true,undefined,2)[0]; //the [0] is really wonky, but it is, in fact, getting the array associated with index 0 of the return value
+        ctx.fillText("Upgrades",410,30);
+        upgradebtns = DrawBars(upgradebars,410,55,undefined,true,undefined,3)[0]
+        //console.log(upgradebtns)
+        
+
+        ctx.stroke();
+
+      }
+
+      //Checks resource (and action) buttons, and handle their onclick effects
+      function CheckButton(){
+        let mx = document.getElementById("x").innerHTML;
+        let my = document.getElementById("y").innerHTML;
+        let barArea = "none"
+        let clickedBar = false //stores the index of the clicked bar
+        let storeresources = [] //deep copy of resources to hold information while the bar's click effects are being processed.
+        //make a deep copy
+        for(let i = 0; i<resources.length; i++){
+          //set up the row
+          storeresources[i]=[]
+          for(let j=0; j<resources[i].length; j++){
+            //copy from the row
+            storeresources[i][j] = resources[i][j];
+          }
+        }
+        
+        //console.log(storeresources)
+        
+        function DoResourceLogic(currenteff,searchres,isprogged = false){
+          let foo = 1;
+          if(isprogged !== false){
+            foo = isprogged;
+          }
+        
+          storeresources[searchres][1] += currenteff[1] * foo;
+
+          //if the resource's value turned negative, break out of the loop and don't save any of the progress...
+          if (storeresources[searchres][1] < 0){
+              //don't let the resources go below zero...
+              if(currenteff[2]){ //...unless it's allowed to.
+                return false;
+              }else{
+                storeresources[searchres][1] = 0;
+              }
+          }
+          
+          //also don't let the resources go above their cap
+          if (storeresources[searchres][1] > storeresources[searchres][2]){
+              if(currenteff[2]){ //...unless it's allowed to.
+                return false;
+              }else{
+                storeresources[searchres][1] = storeresources[searchres][2];
+              }
+          }
+          return true;
+          
+          } //end of DoResourceLogic
+
+        
+
+        function ProcessEffect(curreff,clickedData){
+          //Does the effects
+            
+            for(let i = 0; i<curreff.length;i++){ // for each effect
+              //currenteff stands for "current effect"
+              let currenteff = curreff[i]
+              
+              /** Special Cases **/
+
+              if(currenteff[0] == "Progress"){
+                //progress is a special case because it doesn't exist in the resource list
+                
+                //increment the progress of the button
+                clickedData[1] += currenteff[1]
+              }else if (currenteff[0] == "Unlock"){
+                
+                //search for it in storeresources
+                let searchres = SearchList(actionbars,currenteff[1],0);
+                if(searchres !== false){
+                  actionbars[searchres][5] = true;
+                }else{
+                  
+                  searchres = SearchList(storeresources,currenteff[1],0);
+                
+                  if(searchres !== false){
+                    storeresources[searchres][5] = true;
+                  }else {
+                    searchres = SearchList(upgradebars,currenteff[1],0);
+                    if(searchres !== false){
+                      upgradebars[searchres][5] = true;
+                    }
+                    //add additional unlock casing here
+                  }
+                  
+                }
+                //TODO: Figure out how to delete the unlock effect
+                //end of "Unlock" if/then block, add next special case here
+                //} else if (currenteff[0] == ""){ 
+                
+              }else if (currenteff[0] == "Increment"){
+                //Idk what else could be incremented, so this might be a bit unnecessary but oh well
+                if(currenteff[1] == "Action"){
+                  if(typeof currenteff[2] == "number"){
+                    clickedData[currenteff[2]][currenteff[3]][currenteff[4]][1] += currenteff[5];
+                  } else {
+                    //theoretically, this finds and increments?
+                    let fooo = SearchList(actionbars,currenteff[2],0);
+                    /**
+                    for(let i = 0; i < list.length; i++){
+                      if(upgradebareffects[i][2] == value){
+                        fooo = i;
+                        break;
+                      }
+                    }
+                    **/
+                    if(fooo === false){
+                      throw new Error("Could not find something to increment")
+                      return false;
+                    }
+                    
+                    if(fooo === false){
+                      return false;
+                    }else{
+                      //Don't use clickedData!!!!!
+                      actionbareffects[fooo][currenteff[3]][currenteff[4]][1] += currenteff[5];
+                    }
+                    
+                  }
+                  
+                  
+                } else{
+                  throw new Error("Tried to upgrade something other than an action!")
+                }
+              
+              
+              }else if (typeof curreff[0] == "number"){
+                //the number can be used as-is
+                if(DoResourceLogic(currenteff,searchres) === false){
+                  return false;
+                }
+                
+              }else{
+                //search for it in storeresources
+                let searchres = SearchList(storeresources,currenteff[0],0);
+                
+                if(searchres === currenteff[0]){
+                  //Nothing was found, so throw an error
+                  throw new Error("resource not found (function ProcessEffect). Resource: "+searchres)
+                }else{
+                  //something was found, so increment the resource that was found
+                  if(DoResourceLogic(currenteff,searchres) === false){
+                    return false;
+                  }
+                
+                }
+                
+              }
+          }
+        } //end of ProccessEffect
+        
+
+        function CheckForBtn(bar){
+          //checks if the mouse is within the dimensions of the given bar
+          for (let i=0; i<bar.length; i++){
+            if(
+               mx <= bar[i][0] + bar[i][3] &&
+               mx >= bar[i][0]             &&
+               my <= bar[i][1] + bar[i][2] &&
+               my >= bar[i][1]
+              ){
+                clickedBar = i;
+                return; 
+            }
+          }
+        } //end of CheckForBtn
+        
+
+
+        
+      
+        //Checks if a resourcebar was clicked...
+        CheckForBtn(resourcebtns)
+        if(clickedBar !== false){
+          barArea = "resource";
+        }else{
+          //...if one wasn't, check if an action bar was clicked...
+          CheckForBtn(actionbtns)
+          if(clickedBar !== false){
+            barArea = "action";
+          
+          }else{
+            //...if an action bar wasn't clicked, check for an upgrade button being clicked
+            CheckForBtn(upgradebtns)
+            if(clickedBar !== false){
+            barArea = "upgrade";
+            }//add else statement here for another area, if needed
+          } 
+        }
+        
+        //process according to that area
+        if (clickedBar !== false){
+          //console.log("clickedBar: "+clickedBar)
+          let clickedData = ["error"]; //stores the information of the clicked bar; Deep copy
+          
+          /** Area Processing **/
+          //resource kinda does nothing right now
+          if(barArea == "resource"){
+                      
+          let clickedBar = SearchList(upgradebars,upgradebtns[clickedBar][4],0);
+          if(clickedBar == false){
+            throw new Error("Upgrade Bar Not Found!! Searching for: "+upgradebtns[clickedBar][4]);
+            //the error should exit the function beore the return is reached?
+            //Note: don't count on this returning false, might be better to return the error? Pain to implement though 
+            return false;
+          }
+          
+            //find which bar was clicked, and grab its data
+            for(let i = 0; i<resourcebars[clickedBar].length; i++){
+              clickedData[i] = resourcebars[clickedBar][i];
+            }
+            
+            //TODO: add code for resource button click effects here (if any, probably just displays details in the showbox, whenever that's created)
+
+            
+          } else if (barArea == "action"){
+            
+            
+            
+          
+          let barnum = SearchList(actionbars,actionbtns[clickedBar][0],0);
+          
+          if(clickedBar === false){
+            throw new Error("Upgrade Bar Not Found!! Searching for: "+actionbtns[clickedBar][0]);
+            //the error should exit the function beore the return is reached?
+            //Note: don't count on this returning false, might be better to return the error? Pain to implement though 
+            return false;
+          }
+          
+          
+          
+          
+
+            //deep copy
+            for(let i = 0; i<actionbars[barnum].length; i++){
+              clickedData[i] = actionbars[barnum][i];
+            }
+            //console.log(clickedData)
+            let startprog = clickedData[1]
+            let clickedEffects = actionbareffects[barnum];
+
+            //On click effects
+            let curreff = clickedEffects[0]
+            
+            if(ProcessEffect(curreff, clickedData)===false){
+              return false;
+            }
+            
+            
+            //Does Start Costs
+            function DoStartCost(){
+            
+              //console.log("started") 
+              //code taken from the on click effects
+              if(ProcessEffect(clickedEffects[1],clickedData) === false){
+                return false;
+              }
+
+            } // end of DoStartCost
+            
+            //check if the action was just started from no progress
+            if(startprog == 0 && clickedData[1]>0){
+              if (DoStartCost() === false){
+                return false; //break if the resource goes negative or overflows
+              }
+            }
+            
+            /** On prog effects **/
+            
+            //current effect
+            if(ProcessEffect(clickedEffects[2],clickedData) === false){
+              return false;
+            }
+            
+            /** On comp effects **/
+            while(clickedData[1] >= actionbars[barnum][2]){
+              
+              curreff = clickedEffects[3];
+              if (ProcessEffect(curreff, clickedData) === false){
+                return false;
+              }
+              clickedData[1] -= actionbars[barnum][2];
+              
+            }
+            
+            //save the changes made to the clicked bar
+            actionbars[barnum] = clickedData;
+            resources = storeresources;
+            RedrawScreen();
+
+          //console.log("clickedData:")
+          //console.log(clickedData);
+        }else if (barArea == "upgrade"){
+          //copied from action block
+          
+          let barnum = SearchList(upgradebars,upgradebtns[clickedBar][4],0);
+          
+          if(barnum === false){
+            throw new Error("Upgrade Bar Not Found!! Searching for: "+upgradebtns[clickedBar][4]);
+            //the error should exit the function beore the return is reached?
+            //Note: don't count on this returning false, might be better to return the error? Pain to implement though 
+            return false;
+          }
+          
+          //deep copy
+          for(let i = 0; i<upgradebars[clickedBar].length; i++){
+            clickedData[i] = upgradebars[barnum][i];
+          }
+          //console.log(clickedData)
+          let startprog = clickedData[1]
+          let clickedEffects = upgradebareffects[barnum];
+
+          //On click effects
+          let curreff = clickedEffects[0]
+          //console.log(clickedEffects)
+          
+          if(ProcessEffect(curreff, clickedData)===false){
+            return false;
+          }
+          
+          //Does Start Costs
+          function DoStartCost(){
+          
+            //console.log("started") 
+            //code taken from the on click effects
+            if(ProcessEffect(clickedEffects[1],clickedData) === false){
+              return false;
+            }
+
+          } // end of DoStartCost
+          
+          
+          //check if the action was just started from no progress
+          if(startprog == 0 && clickedData[1]>0){
+            if (DoStartCost() === false){
+              return false; //break if the resource goes negative or overflows
+            }
+          }
+          
+          /** On prog effects **/
+            //current effect
+            if(ProcessEffect(clickedEffects[2],clickedData) === false){
+              return false;
+            }
+            
+            /** On comp effects **/
+
+            while(clickedData[1] >= upgradebars[barnum][2]){
+
+              curreff = clickedEffects[3];
+              //this is the last passed test, therefore processeffect is breaking
+              if (ProcessEffect(curreff, clickedData) === false){
+                return false;
+              }
+              
+              //resets progress, but allows the action to be completed multiple times per click. TODO: Should probably be doing start costs here as well, or else it will only cost one start cost per click
+              clickedData[1] -= upgradebars[barnum][2];
+              clickedData[7]++;
+
+            }
+
+            //save the changes made to the clicked bar
+            upgradebars[barnum] = clickedData;
+            resources = storeresources;
+            RedrawScreen();
+            
+          
+          
+          
+          
+        }else{
+          //this code doesn't seem to be working?
+          //this throws an error if a button wasn't clicked as well
+          //throw new RangeError("Could not find button");
+          console.log("no button was pressed");
+        }
+        
+        }
+      } // end of CheckButton
+
+      function DrawBar(x, y, h, w, prog, max = 100, colour="Green",bcolour="Black",dotext=false) {
+        if(max==0){
+          throw new RangeError("In function DrawBar; max was 0, aborting drawing bar with \n x: "
+                               +x+
+                               "\n y: "
+                               +y+
+                              "\n height: "
+                              +h+
+                              "\nwidth: "
+                              +w+
+                              "\nprogress: "
+                              +prog+
+                              "\ncolour: "
+                               +colour+
+                              "\nBorder Colour: "
+                              +bcolour
+                              );
+          return "failed";
+        }
+        ctx.fillStyle = colour;
+        ctx.strokeStyle=bcolour;
+        ctx.fillRect(x, y, w*(prog/max),h);
+        ctx.strokeRect(x, y, w, h);
+        if(dotext !== false){
+        ctx.fillStyle = "Black"
+        let foo = ctx.textAlign
+        ctx.textAlign = "center"
+        ctx.fillText(dotext,x+w/2,y+h/2)
+        ctx.textAlign = foo
+        }
+      }
+      
+      function DrawBars(bars = resources, xPad = 30, yPad = 30, barSep = 50, dotext = false, barsepx = 320, columns = 1){
+        ctx.beginPath();
+        ctx.strokeStyle = "Black";
+        ctx.fillStyle = "Green";
+        let btnlist = []
+        let txt = false
+        let barsdrawn = 0;
+        
+        for (let i = 0; i < bars.length; i++) {
+          if(bars[i][5] === true && !(bars == upgradebars && bars[i][7] >= bars[i][6])){
+            barsdrawn++;
+            if(dotext){
+              txt = bars[i][0] 
+            }
+              //draw buttons
+              DrawBar(xPad+barsepx*((barsdrawn-1)%columns),yPad+barSep*((barsdrawn-(barsdrawn-1)%columns)/columns),40,300,bars[i][1],bars[i][2],bars[i][3],bars[i][4],txt);
+              //add button bounds to a list
+              //format: x offset, y offset, height, width, name
+              //the +10 & +50 are to account for the canvas's offset
+              btnlist[btnlist.length] = [xPad+barsepx*((barsdrawn-1)%columns),yPad+barSep*((barsdrawn-(barsdrawn-1)%columns)/columns+1),40,300,bars[i][0]];
+              
+          }
+        }
+        ctx.stroke();
+        //console.log(btnlist)
+        return [btnlist,barsdrawn];
+      }
+    
+      RedrawScreen();
+
+
+    </script>
+</html>
+
+
