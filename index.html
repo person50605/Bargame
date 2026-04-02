@@ -335,9 +335,9 @@
         ctx.beginPath();
 
         //draw bars and buttons
-        let barfoo = DrawBars(resources,30,-30);
-        
+        let barfoo = DrawBars(resources,30,-30); //could probably be merged with the next line
         resourcebtns = barfoo[0];
+        
         ctx.strokeStyle = "Black";
         ctx.fillStyle = "Black";
         ctx.font = "25px serif"
@@ -359,6 +359,7 @@
                my <= bar[i][1] + bar[i][2] &&
                my >= bar[i][1]
               ){
+                //returns the bar's index in the bar list
                 return i; 
             }
           }
@@ -383,13 +384,13 @@
               return false;
               
             }else{
-              clickedBar = SearchList(upgradebars,upgradebtns[clickedBar][3],0);
+              clickedBar = SearchList(upgradebars,upgradebtns[clickedBar][4],0);
             }
           } else{
-            clickedBar = SearchList(actionbars,actionbtns[clickedBar][3],0);
+            clickedBar = SearchList(actionbars,actionbtns[clickedBar][4],0);
           }
         } else{
-          clickedBar = SearchList(resources,resourcebtns[clickedBar][3],0);
+          clickedBar = SearchList(resources,resourcebtns[clickedBar][4],0);
         }
         //offsets are to compensate for canvas offset. Extra 20px so the mouse doesn't cover the box.
         if(clickedBar !== false){
@@ -408,20 +409,22 @@
           ctx.fillRect(boxX,boxY,boxWidth,boxHeight)
           ctx.strokeRect(boxX,boxY,boxWidth,boxHeight)
           
-          
-
-          
           ctx.lineWidth = 1;
           const ttlw = 300; //tooltip line width (in px)
           const lspace = 10; //letter space 
           const lheight = 20; // line height
           const xpad = 20;
           const ypad = 5+lheight;
+
           if(descDraw != "Error"){
-            clickedBar = SearchList()
-            //TODO: this is broken, it doesn't account for hidden bars.
             descDraw = barDescs[descDraw][clickedBar]
+            
+                        ctx.fillText(descDraw,10,100)
+
             console.log(descDraw)
+            //TODO: something past here isn't working. It has the correct desc, but doesn't draw it sometimes. 
+            //Only on Buy More Bag Space (BMBS) for some reason.
+            //Actually, only broken for BMBS
           }
           else{
             throw new Error("descDraw is Error");
